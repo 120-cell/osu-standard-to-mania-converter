@@ -5,13 +5,10 @@ A python script that generates osu mania maps from standard maps. The mania maps
 ## Configuration
 The first few lines of the script can be changed to configure the following options:
 - mania key count 
-  - default: 4
 - length in beats of the holds that hit circles get turned into
-  - default: 0 (normal mania notes)
+  - 0 will result in normal mania notes
 - starting column
-  - default: 1
-- direction of the column cycle
-  - default: left to right.
+- direction of the lane cycle.
 
 ## Running the Script
 The script requires only the python standard library (version 3.10 or above).
