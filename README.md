@@ -13,7 +13,7 @@ The first few lines of the script can be changed to configure the following opti
 ## Running the Script
 The script requires only the python standard library (version 3.10 or above).
 
-To run it via the command line use:
+Run it via the command line:
 ```shell
 python mania-converter.py
 ```
