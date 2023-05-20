@@ -34,7 +34,7 @@ The following will convert all .osu files in the `Maps` and `MoreMaps` directori
 python mania-converter.py -d Maps MoreMaps
 ```
 
-They can also be used in conjunction, in which case the arguments passed to `-f` should filenames and not full paths.
+They can also be used in conjunction, in which case the arguments passed to `-f` should be filenames and not full paths.
 
 The following will convert all instances of `map2.osu` and `map3.osu` that appear in `Maps`, `MoreMaps` or their subdirectories:
 ```shell
