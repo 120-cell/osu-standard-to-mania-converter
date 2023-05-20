@@ -1,6 +1,6 @@
 # Standard to Mania Converter
 
-A python script that generates osu mania maps from standard maps. The mania maps cycle continuously throught the lanes. Hitcircles can either be turned into normal mania notes or into short holds of a set length.
+A python script that generates osu mania maps from standard maps. The mania maps cycle continuously through the lanes. Hitcircles can either be turned into normal mania notes or into short holds of a set length.
 
 ## Configuration
 The first few lines of the script can be changed to configure the following options:
