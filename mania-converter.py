@@ -29,7 +29,7 @@ def main():
         converted_anything = process_directories(dir_paths)
     elif '-f' in sys.argv:
         # file flag
-        # if only -f is passed, the arguments should be paths to the file, not just filenames.
+        # if only -f is passed, the arguments should be file paths
         file_paths = get_flag_arguments('-f', sys.argv)
         for file_path in file_paths:
             process_diff(file_path)
