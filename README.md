@@ -8,7 +8,9 @@ The first few lines of the script can be changed to configure the following opti
 - length in beats of the holds that hit circles get turned into
   - 0 will result in normal mania notes
 - starting column
-- direction of the lane cycle.
+- direction of the lane cycle
+- whether to equalise all scroll velocity multipliers
+  - the timing point multipliers are set to 1, but the base value remains.
 
 ## Running the Script
 The script requires only the python standard library (version 3.10 or above).

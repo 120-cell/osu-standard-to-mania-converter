@@ -1,7 +1,9 @@
 KEY_COUNT = 4
 HOLD_LENGHT_BEATS = 0 # 0 will produce normal notes
-STARTING_COLUMN = 1
+STARTING_LANE = 1
 LEFT_TO_RIGHT = True
+EQUALISE_SV = True
+
 
 
 import logging
@@ -9,6 +11,9 @@ import re
 import os
 import sys
 from math import ceil
+
+
+sys.argv = ['py', '-d', '../test']
 
 
 def main():
@@ -94,8 +99,10 @@ def process_diff(filename: str):
     
     file_text = change_hitobject_text(file_text)
     file_text = change_mode(file_text, 3)
-    file_text = change_column_count(file_text, KEY_COUNT)
+    file_text = change_lane_count(file_text, KEY_COUNT)
     file_text = change_diff_name(file_text)
+    if EQUALISE_SV:
+        file_text = change_slider_multipliers(file_text)
     
     with open(f'{filename[:-4]}[mania].osu', 'w') as mania_file:
         mania_file.write(file_text)
@@ -116,9 +123,9 @@ def change_hitobject_text(file_text):
     hitobject_lines =  [','.join(hitobject) for hitobject in hitobjects]
     hitobject_text = '\n'.join(hitobject_lines)
     file_text = (f"{file_text[:h_text_start]}[HitObjects]\n"
-                    f"{hitobject_text}\n"
-                    f"\n"
-                    f"{file_text[h_text_end:]}")
+                 f"{hitobject_text}\n"
+                 f"\n"
+                 f"{file_text[h_text_end:]}")
     return file_text
 
 
@@ -132,7 +139,7 @@ def find_hitobjects(file_text: str):
 
 
 def change_hitobjects(file_text, hitobjects):
-    timing_points = find_timing_points(file_text)
+    timing_points, _ = find_timing_points(file_text)
     slider_multipliers = [(float(time), -100/float(beat_length))
                           for time, beat_length, _, _, _, _,uninherited, _ in timing_points
                           if not int(uninherited)]
@@ -152,9 +159,11 @@ def change_hitobjects(file_text, hitobjects):
 
 def find_timing_points(file_text: str):
     timing_pattern = re.compile(r'\[TimingPoints\].*?(\[|\Z)', re.DOTALL)
-    timing_text = timing_pattern.search(file_text).group()[14:-1].strip()
+    timing_match = timing_pattern.search(file_text)
+    timing_text = timing_match.group()[14:-1].strip()
     timing_lines = timing_text.split('\n')
-    return [fill_list(timing_line.split(','), 1, 8) for timing_line in timing_lines]
+    timing_points = [fill_list(timing_line.split(','), 1, 8) for timing_line in timing_lines]
+    return timing_points, timing_match.span()
 
 
 def fill_list(target, fill_value, max_length):
@@ -210,11 +219,12 @@ def find_timing_value(target_time, timestamped_values):
         
 
 def mania_x_position(hitobject_index):
+    PLAYFIELD_WIDTH = 512
     if LEFT_TO_RIGHT:
-        column = (STARTING_COLUMN - 1 + hitobject_index) % KEY_COUNT
+        lane = (STARTING_LANE - 1 + hitobject_index) % KEY_COUNT
     else:
-        column = (STARTING_COLUMN - 1 - hitobject_index) % KEY_COUNT
-    return ceil(512 * column/KEY_COUNT)
+        lane = (STARTING_LANE - 1 - hitobject_index) % KEY_COUNT
+    return ceil(PLAYFIELD_WIDTH * lane/KEY_COUNT)
 
 
 def change_mode(file_text, mode):
@@ -227,16 +237,33 @@ def change_mode(file_text, mode):
     return f'{file_text[:mode_match.start()]}Mode: {mode}\n{file_text[mode_match.end():]}'
 
 
-def change_column_count(file_text, column_count):
+def change_lane_count(file_text, lane_count):
     cs_pattern = re.compile(r'CircleSize:.*?\n')
     cs_match=cs_pattern.search(file_text)
-    return f'{file_text[:cs_match.start()]}CircleSize: {column_count}\n{file_text[cs_match.end():]}'
+    return f'{file_text[:cs_match.start()]}CircleSize: {lane_count}\n{file_text[cs_match.end():]}'
 
 
 def change_diff_name(file_text):
     diffname_pattern = re.compile(r'Version:')
     diffname_end = diffname_pattern.search(file_text).end()
     return f'{file_text[:diffname_end]}mania {file_text[diffname_end:]}'
+
+
+def change_slider_multipliers(file_text):
+    DEFAULT_SLIDERMULTIPLIER = '-100'
+    timing_points, (t_text_start, t_text_end) = find_timing_points(file_text)
+    for timing_point in timing_points:
+        uninherited = int(timing_point[6])
+        if not uninherited:
+            timing_point[1] = DEFAULT_SLIDERMULTIPLIER
+    timing_lines = [','.join(timing_point) for timing_point in timing_points]
+    timing_text = '\n'.join(timing_lines)
+    file_text = (f"{file_text[:t_text_start]}[TimingPoints]\n"
+                 f"{timing_text}\n"
+                 f"\n"
+                 f"{file_text[t_text_end:]}")
+    return file_text
+
     
 
 if __name__ == '__main__':
