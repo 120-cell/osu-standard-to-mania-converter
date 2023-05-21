@@ -1,7 +1,7 @@
-key_count = 4
-hold_length_beats = 0 # 0 will produce normal notes
-starting_column = 1
-left_to_right = True
+KEY_COUNT = 4
+HOLD_LENGHT_BEATS = 0 # 0 will produce normal notes
+STARTING_COLUMN = 1
+LEFT_TO_RIGHT = True
 
 
 import logging
@@ -48,40 +48,6 @@ def get_flag_arguments(flag, args):
             stop = start + i
             return args[start:stop]
     return args[start:]
-    
-
-def find_timing_value(target_time, timestamped_values):
-    for (_, value), (next_time, _) in zip([(0, 1)] + timestamped_values, timestamped_values + [(-1, 0)]):
-        if next_time > target_time:
-            return(value)
-    return timestamped_values[-1][1]
-
-
-def change_mode_setting(file_text, mode):
-    mode_pattern = re.compile(r'Mode:.*?\n')
-    mode_match = mode_pattern.search(file_text)
-    if not mode_match:
-        general_pattern = re.compile(r'\[General\].*?\n')
-        general_match = general_pattern.search(file_text)
-        return f'{file_text[:general_match.end()]}Mode: {mode}\n{file_text[general_match.end():]}'
-    return f'{file_text[:mode_match.start()]}Mode: {mode}\n{file_text[mode_match.end():]}'
-
-
-def change_column_count(file_text, column_count):
-    cs_pattern = re.compile(r'CircleSize:.*?\n')
-    cs_match=cs_pattern.search(file_text)
-    return f'{file_text[:cs_match.start()]}CircleSize: {column_count}\n{file_text[cs_match.end():]}'
-
-
-def is_allowed(file, allowed_files):
-    if not (allowed_files == 'all' or isinstance(allowed_files, list)):
-        raise TypeError(f'allowed_files expected list, got {type(allowed_files)}')
-    if not file.endswith('.osu'):
-        logging.info('not a .osu file')
-        return False
-    if allowed_files == 'all' or file in allowed_files:
-        return True
-    return False
 
 
 def process_directories(dir_paths, allowed_files='all'):
@@ -102,8 +68,18 @@ def process_directory(dir_path, allowed_files='all'):
             if is_allowed(file, allowed_files):
                 process_diff(os.path.join(subdir, file))
                 converted_anything = True
-    
     return converted_anything
+
+
+def is_allowed(file, allowed_files):
+    if not (allowed_files == 'all' or isinstance(allowed_files, list)):
+        raise TypeError(f'allowed_files expected list, got {type(allowed_files)}')
+    if not file.endswith('.osu'):
+        logging.debug(f'{file} is not a .osu file')
+        return False
+    if allowed_files == 'all' or file in allowed_files:
+        return True
+    return False
 
 
 def process_diff(filename: str):
@@ -111,28 +87,52 @@ def process_diff(filename: str):
     with open(filename) as osu_file:
         file_text = osu_file.read()
     
+    mode = find_mode(file_text)
+    if not mode == 0:
+        logging.info('not a standard diff')
+        return
+    
+    file_text = change_hitobject_text(file_text)
+    file_text = change_mode(file_text, 3)
+    file_text = change_column_count(file_text, KEY_COUNT)
+    file_text = change_diff_name(file_text)
+    
+    with open(f'{filename[:-4]}[mania].osu', 'w') as mania_file:
+        mania_file.write(file_text)
+
+
+def find_mode(file_text):
+    mode = 0
     mode_pattern = re.compile(r'Mode:.*?\n')
     mode_match = mode_pattern.search(file_text)
     if mode_match:
         mode = int(mode_match.group()[5:-1].strip())
-    else:
-        mode = 0
-    if not mode == 0:
-        logging.info('not a standard diff')
-        return False
-    
-    sv_pattern = re.compile(r'SliderMultiplier:.*?\n')
-    base_sv = float(sv_pattern.search(file_text).group()[17:-1].strip())
-    
+    return mode
+
+
+def change_hitobject_text(file_text):
+    hitobjects, (h_text_start, h_text_end) = find_hitobjects(file_text)
+    hitobjects = change_hitobjects(file_text, hitobjects)
+    hitobject_lines =  [','.join(hitobject) for hitobject in hitobjects]
+    hitobject_text = '\n'.join(hitobject_lines)
+    file_text = (f"{file_text[:h_text_start]}[HitObjects]\n"
+                    f"{hitobject_text}\n"
+                    f"\n"
+                    f"{file_text[h_text_end:]}")
+    return file_text
+
+
+def find_hitobjects(file_text: str):
     hitobject_pattern = re.compile(r'\[HitObjects\].*?(\[|\Z)', re.DOTALL)
     hitobject_match = hitobject_pattern.search(file_text)
     hitobject_text = hitobject_match.group()[13:-1].strip()
     hitobject_lines = hitobject_text.split('\n')
-    
-    timing_pattern = re.compile(r'\[TimingPoints\].*?(\[|\Z)', re.DOTALL)
-    timing_text = timing_pattern.search(file_text).group()[14:-1].strip()
-    timing_lines = timing_text.split('\n')
-    timing_points = [timing_line.split(',') + [1]*(8 - len(timing_line.split(','))) for timing_line in timing_lines]
+    hitobjects = [hitobject_line.split(',') for hitobject_line in hitobject_lines]
+    return hitobjects, hitobject_match.span()
+
+
+def change_hitobjects(file_text, hitobjects):
+    timing_points = find_timing_points(file_text)
     slider_multipliers = [(float(time), -100/float(beat_length))
                           for time, beat_length, _, _, _, _,uninherited, _ in timing_points
                           if not int(uninherited)]
@@ -141,55 +141,102 @@ def process_diff(filename: str):
     beat_lengths = [(float(time), float(beat_length))
                     for time, beat_length, _, _, _, _,uninherited, _ in timing_points
                     if int(uninherited)]
+
     
-    for i, hitobject_line in enumerate(hitobject_lines):
-        hitobject = hitobject_line.split(',')
-        x, y, time, type_ = (int(value) for value in hitobject[:4])
-        type_bits = [int(bit) for bit in f'{type_:08b}'[::-1]]
-        beat_length = find_timing_value(time, beat_lengths)
-        if type_bits[0]:
-            # hit circle: x,y,time,type,hitSound,hitSample
-            if hold_length_beats == 0:
-                new_hitobject = hitobject
-            else:
-                new_hitobject = hitobject[:5] + [str(time + beat_length * hold_length_beats)]
-                new_hitobject[3] = '128'
-        elif type_bits[1]:
-            # slider: x,y,time,type,hitSound,curveType|curvePoints,slides,length,edgeSounds,edgeSets,hitSample
-            slides = int(hitobject[6])
-            length = float(hitobject[7])
-            slider_velocity = base_sv * find_timing_value(time, slider_multipliers)
-            new_hitobject = hitobject[:5] + [str(time + beat_length * slides * length / (100*slider_velocity))]
-            new_hitobject[3] = '128'
-            # doesn't transfer hitsamples from slider
-            # (can't be bothered to figure out how the optional parameters work)
-        elif type_bits[3]:
-            # spinner: x,y,time,type,hitSound,endTime,hitSample
+    base_sv = find_base_sv(file_text)
+    for hitobject_index, hitobject in enumerate(hitobjects):
+        new_hitobject = change_hitobject(hitobject_index, hitobject, base_sv, slider_multipliers, beat_lengths)
+        hitobjects[hitobject_index] = new_hitobject
+    return hitobjects
+
+
+def find_timing_points(file_text: str):
+    timing_pattern = re.compile(r'\[TimingPoints\].*?(\[|\Z)', re.DOTALL)
+    timing_text = timing_pattern.search(file_text).group()[14:-1].strip()
+    timing_lines = timing_text.split('\n')
+    return [fill_list(timing_line.split(','), 1, 8) for timing_line in timing_lines]
+
+
+def fill_list(target, fill_value, max_length):
+    return target + [fill_value] * (max_length - len(target))
+
+
+def find_base_sv(file_text):
+    sv_pattern = re.compile(r'SliderMultiplier:.*?\n')
+    return float(sv_pattern.search(file_text).group()[17:-1].strip())
+
+
+def change_hitobject(hitobject_index, hitobject, base_sv, slider_multipliers, beat_lengths):
+    HITCIRCLE_BIT = 0
+    SLIDER_BIT = 1
+    SPINNER_BIT = 3
+    MANIA_HOLD_BIT = 7
+    MANIA_HOLD_TYPE = str(2**MANIA_HOLD_BIT)
+    
+    x, y, time, type_ = (int(value) for value in hitobject[:4])
+    type_bits = [int(bit) for bit in f'{type_:08b}'[::-1]]
+    beat_length = find_timing_value(time, beat_lengths)
+    if type_bits[HITCIRCLE_BIT]:
+        # hit circle format: x,y,time,type,hitSound,hitSample
+        if HOLD_LENGHT_BEATS == 0:
             new_hitobject = hitobject
-            new_hitobject[3] = '128'
-        
-        if left_to_right:
-            column = (starting_column - 1 + i) % key_count
         else:
-            column = (starting_column - 1 - i) % key_count
-        new_hitobject[0] = str(ceil(512 * column/key_count))
-        hitobject_lines[i] = ','.join(new_hitobject)
-        # mania hold: x,y,time,type,hitSound,endTime,hitSample
+            new_hitobject = hitobject[:5] + [str(time + beat_length * HOLD_LENGHT_BEATS)]
+            new_hitobject[3] = MANIA_HOLD_TYPE
+    elif type_bits[SLIDER_BIT]:
+        # slider format: x,y,time,type,hitSound,curveType|curvePoints,slides,length,edgeSounds,edgeSets,hitSample
+        slides = int(hitobject[6])
+        length = float(hitobject[7])
+        slider_velocity = base_sv * find_timing_value(time, slider_multipliers)
+        new_hitobject = hitobject[:5] + [str(time + beat_length * slides * length / (100*slider_velocity))]
+        new_hitobject[3] = MANIA_HOLD_TYPE
+        # doesn't transfer hitsamples from slider
+        # (can't be bothered to figure out how the optional parameters work)
+    elif type_bits[SPINNER_BIT]:
+        # spinner format: x,y,time,type,hitSound,endTime,hitSample
+        new_hitobject = hitobject
+        new_hitobject[3] = MANIA_HOLD_TYPE
+    new_hitobject[0] = str(mania_x_position(hitobject_index))
+    # mania hold format: x,y,time,type,hitSound,endTime,hitSample
+    return new_hitobject
     
-    
-    hitobject_text = '\n'.join(hitobject_lines)
-    file_text = (f"{file_text[:hitobject_match.start()]}[HitObjects]\n"
-                 f"{hitobject_text}\n"
-                 f"\n"
-                 f"{file_text[hitobject_match.end():]}")
-    file_text = change_mode_setting(file_text, 3)
-    file_text = change_column_count(file_text, key_count)
+
+def find_timing_value(target_time, timestamped_values):
+    # iterate throgh two copies of timestamped_values, one shifted by 1
+    for (_, value), (next_time, _) in zip([(0, 1)] + timestamped_values, timestamped_values + [(-1, 0)]):
+        if next_time > target_time:
+            return(value)
+    return timestamped_values[-1][1]
+        
+
+def mania_x_position(hitobject_index):
+    if LEFT_TO_RIGHT:
+        column = (STARTING_COLUMN - 1 + hitobject_index) % KEY_COUNT
+    else:
+        column = (STARTING_COLUMN - 1 - hitobject_index) % KEY_COUNT
+    return ceil(512 * column/KEY_COUNT)
+
+
+def change_mode(file_text, mode):
+    mode_pattern = re.compile(r'Mode:.*?\n')
+    mode_match = mode_pattern.search(file_text)
+    if not mode_match:
+        general_pattern = re.compile(r'\[General\].*?\n')
+        general_match = general_pattern.search(file_text)
+        return f'{file_text[:general_match.end()]}Mode: {mode}\n{file_text[general_match.end():]}'
+    return f'{file_text[:mode_match.start()]}Mode: {mode}\n{file_text[mode_match.end():]}'
+
+
+def change_column_count(file_text, column_count):
+    cs_pattern = re.compile(r'CircleSize:.*?\n')
+    cs_match=cs_pattern.search(file_text)
+    return f'{file_text[:cs_match.start()]}CircleSize: {column_count}\n{file_text[cs_match.end():]}'
+
+
+def change_diff_name(file_text):
     diffname_pattern = re.compile(r'Version:')
     diffname_end = diffname_pattern.search(file_text).end()
-    file_text = f'{file_text[:diffname_end]}mania {file_text[diffname_end:]}'
-    
-    with open(f'{filename[:-4]}[mania].osu', 'w') as mania_file:
-        mania_file.write(file_text)
+    return f'{file_text[:diffname_end]}mania {file_text[diffname_end:]}'
     
 
 if __name__ == '__main__':
