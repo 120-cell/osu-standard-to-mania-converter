@@ -1,5 +1,5 @@
 KEY_COUNT = 4
-HOLD_LENGHT_BEATS = 0 # 0 will produce normal notes
+HOLD_LENGTH_BEATS = 0 # 0 will produce normal notes
 STARTING_LANE = 1
 LEFT_TO_RIGHT = True
 EQUALISE_SV = True
@@ -12,8 +12,6 @@ import os
 import sys
 from math import ceil
 
-
-sys.argv = ['py', '-d', '../test']
 
 
 def main():
@@ -187,10 +185,10 @@ def change_hitobject(hitobject_index, hitobject, base_sv, slider_multipliers, be
     beat_length = find_timing_value(time, beat_lengths)
     if type_bits[HITCIRCLE_BIT]:
         # hit circle format: x,y,time,type,hitSound,hitSample
-        if HOLD_LENGHT_BEATS == 0:
+        if HOLD_LENGTH_BEATS == 0:
             new_hitobject = hitobject
         else:
-            new_hitobject = hitobject[:5] + [str(time + beat_length * HOLD_LENGHT_BEATS)]
+            new_hitobject = hitobject[:5] + [str(time + beat_length * HOLD_LENGTH_BEATS)]
             new_hitobject[3] = MANIA_HOLD_TYPE
     elif type_bits[SLIDER_BIT]:
         # slider format: x,y,time,type,hitSound,curveType|curvePoints,slides,length,edgeSounds,edgeSets,hitSample
