@@ -87,7 +87,7 @@ def is_allowed(file, allowed_files):
 
 def process_diff(filename: str):
     logging.info(f'processing {filename}')
-    with open(filename) as osu_file:
+    with open(filename, 'r', encoding='utf-8') as osu_file:
         file_text = osu_file.read()
     
     mode = find_mode(file_text)
