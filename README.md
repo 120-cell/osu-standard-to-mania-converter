@@ -40,6 +40,8 @@ The following will convert all instances of `map2.osu` and `map3.osu` that appea
 python mania-converter.py -d Maps MoreMaps -f map2.osu map3.osu
 ```
 
+If bash complains about an exclamation mark in a path, encase the path in single quotes.
+
 
 
 
