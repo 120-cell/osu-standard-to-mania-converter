@@ -132,7 +132,10 @@ def find_hitobjects(file_text: str):
     hitobject_match = hitobject_pattern.search(file_text)
     hitobject_text = hitobject_match.group()[13:-1].strip()
     start, end = hitobject_match.span()
-    span = (start, end - 1)
+    if hitobject_match.group()[-1] == '[':
+        span = (start, end - 1)
+    else:
+        span = (start, end)
     hitobject_lines = hitobject_text.split('\n')
     hitobjects = [hitobject_line.split(',') for hitobject_line in hitobject_lines]
     return hitobjects, span 
@@ -162,7 +165,10 @@ def find_timing_points(file_text: str):
     timing_match = timing_pattern.search(file_text)
     timing_text = timing_match.group()[14:-1].strip()
     start, end = timing_match.span()
-    span = (start, end - 1)
+    if timing_match.group()[-1] == '[':
+        span = (start, end - 1)
+    else:
+        span = (start, end)
     timing_lines = timing_text.split('\n')
     timing_points = [fill_list(timing_line.split(','), 1, 8) for timing_line in timing_lines]
     return timing_points, span
