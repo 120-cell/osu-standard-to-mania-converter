@@ -131,9 +131,11 @@ def find_hitobjects(file_text: str):
     hitobject_pattern = re.compile(r'\[HitObjects\].*?(\[|\Z)', re.DOTALL)
     hitobject_match = hitobject_pattern.search(file_text)
     hitobject_text = hitobject_match.group()[13:-1].strip()
+    start, end = hitobject_match.span()
+    span = (start, end - 1)
     hitobject_lines = hitobject_text.split('\n')
     hitobjects = [hitobject_line.split(',') for hitobject_line in hitobject_lines]
-    return hitobjects, hitobject_match.span()
+    return hitobjects, span 
 
 
 def change_hitobjects(file_text, hitobjects):
@@ -159,9 +161,11 @@ def find_timing_points(file_text: str):
     timing_pattern = re.compile(r'\[TimingPoints\].*?(\[|\Z)', re.DOTALL)
     timing_match = timing_pattern.search(file_text)
     timing_text = timing_match.group()[14:-1].strip()
+    start, end = timing_match.span()
+    span = (start, end - 1)
     timing_lines = timing_text.split('\n')
     timing_points = [fill_list(timing_line.split(','), 1, 8) for timing_line in timing_lines]
-    return timing_points, timing_match.span()
+    return timing_points, span
 
 
 def fill_list(target, fill_value, max_length):
